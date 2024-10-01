@@ -3,43 +3,34 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.preprocessing import StandardScaler
 
 # Load the data
 df = pd.read_csv('games.csv')
 
-# Set up the Streamlit app
-def main():
-    st.title('Dashboard de Desempenho dos Alunos')
-    st.sidebar.title('Opções')
+# 2. Exibir o DataFrame no Streamlit
+st.title('Análise do Jogo de Multiplicação')
+st.write('Dados do Jogo:')
+st.dataframe(df)
 
-    # Análise de Desempenho Médio dos Alunos
-    st.header('Desempenho Médio dos Alunos')
-    student_performance = df.groupby('player')['hits'].mean().sort_values(ascending=False)
-    st.bar_chart(student_performance)
+# 3. Pré-processamento
+features = df[['hits', 'fator1', 'fator2', 'result']]
 
-    # Identificar alunos que podem precisar de mais ajuda
-    st.header('Alunos que Podem Precisar de Mais Ajuda')
-    students_needing_help = student_performance[student_performance < student_performance.mean()]
-    st.write(students_needing_help)
+# Normalizando os dados
 
-    # Progresso dos Alunos ao Longo do Tempo
-    st.header('Progresso dos Alunos ao Longo do Tempo')
-    df['game_id'] = pd.to_numeric(df['game_id'])
-    df = df.sort_values('game_id')
-    df['cumulative_avg'] = df.groupby('player')['hits'].expanding().mean().reset_index(level=0, drop=True)
-    for player in df['player'].unique():
-        player_data = df[df['player'] == player]
-        plt.plot(player_data['game_id'], player_data['cumulative_avg'], label=player)
-    plt.title('Progresso dos Alunos ao Longo do Tempo')
-    plt.xlabel('ID do Jogo')
-    plt.ylabel('Média Cumulativa de Acertos')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    st.pyplot(plt)
+scaler = StandardScaler()
+scaled_features = scaler.fit_transform(features)
 
-    # Frequência das Operações de Multiplicação
-    st.header('Frequência das Operações de Multiplicação')
-    operation_frequency = df['multiplication'].value_counts()
-    st.bar_chart(operation_frequency)
+# 4. Aplicação do K-Means
+kmeans = KMeans(n_clusters=3, random_state=42)
+df['cluster_kmeans'] = kmeans.fit_predict(scaled_features)
 
-if __name__ == '__main__':
-    main()
+# 5. Gráfico de Dispersão interativo com clusters
+fig = px.scatter(df, x='fator1', y='fator2', color='cluster_kmeans', 
+                 title='Clusters de Jogadores com base nos Fatores')
+st.plotly_chart(fig)
+
+# 6. Gráficos adicionais
+st.write('Distribuição de Resultados por Cluster:')
+fig2 = px.histogram(df, x='result', color='cluster_kmeans', nbins=10, title='Histograma de Resultados')
+st.plotly_chart(fig2)
