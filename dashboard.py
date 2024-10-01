@@ -1,62 +1,89 @@
-# Import necessary libraries
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-<<<<<<< HEAD
- 
-st.set_page_config(layout='wide')
-=======
-from sklearn.preprocessing import StandardScaler
->>>>>>> bfaa4958a25f1a607a4dff95f80ce0ad708716ee
+import plotly.express as px
+from sklearn.metrics import (accuracy_score, classification_report,
+                             confusion_matrix, roc_curve, auc)
 
-# Load the data
-df = pd.read_csv('games.csv')
+from data_loading_process import load_and_preprocess_data
+from model_training import train_model
 
-<<<<<<< HEAD
+# Load data and preprocess
+df_inicial, df, multiplications_df, df_identificacao_encoder, X_train, X_test, y_train, y_test = load_and_preprocess_data()
 
-col1, col2, col3 = st.columns(3)
-col4, col5, col6 = st.columns(3)
+# Train models
+models, class_weights = train_model(X_train, y_train)
 
-# Adiciona conteúdo à primeira coluna
-with col1:
-    st.header("Resumo Estatístico")
-    st.dataframe(df['hits'].describe())
+# Title of the dashboard
+st.title('Dashboard de Análise de Dificuldades dos Alunos')
 
-# Adiciona conteúdo à segunda coluna
-with col2:
-    st.header("Coluna 2")
-    st.write("Esta é a segunda coluna.")
-
-# Adiciona conteúdo à terceira coluna
-with col3:
-    st.header("Coluna 3")
-    st.write("Esta é a terceira coluna.")
-=======
-# 2. Exibir o DataFrame no Streamlit
-st.title('Análise do Jogo de Multiplicação')
-st.write('Dados do Jogo:')
+# Section 1: Data Overview
+st.subheader('Dados do Jogo:')
+st.dataframe(df_inicial)
 st.dataframe(df)
+st.dataframe(multiplications_df)
+st.dataframe(df_identificacao_encoder)
 
-# 3. Pré-processamento
-features = df[['hits', 'fator1', 'fator2', 'result']]
+# Section 2: K-Means Clustering
+st.header('Análise de Clusters de Jogadores')
+# Add your K-Means clustering code here...
 
-# Normalizando os dados
+# Section 3: Select Class for Analysis
+# Add your class selection code here...
 
-scaler = StandardScaler()
-scaled_features = scaler.fit_transform(features)
+# Section 4: Model Training and Evaluation
+st.title("Modelo de Machine Learning para Análise de Desempenho")
 
-# 4. Aplicação do K-Means
-kmeans = KMeans(n_clusters=3, random_state=42)
-df['cluster_kmeans'] = kmeans.fit_predict(scaled_features)
+# Evaluate models
+for name, model in models.items():
+    y_pred = model.predict(X_test)
 
-# 5. Gráfico de Dispersão interativo com clusters
-fig = px.scatter(df, x='fator1', y='fator2', color='cluster_kmeans', 
-                 title='Clusters de Jogadores com base nos Fatores')
-st.plotly_chart(fig)
+    st.write(f"**Model:** {name}")
+    st.write(f"**Acurácia:** {accuracy_score(y_test, y_pred):.2f}")
 
-# 6. Gráficos adicionais
-st.write('Distribuição de Resultados por Cluster:')
-fig2 = px.histogram(df, x='result', color='cluster_kmeans', nbins=10, title='Histograma de Resultados')
-st.plotly_chart(fig2)
->>>>>>> bfaa4958a25f1a607a4dff95f80ce0ad708716ee
+    # Classification report
+    report = classification_report(y_test, y_pred, output_dict=True)
+    st.write("**Relatório de Classificação:**")
+    st.write(pd.DataFrame(report).transpose())
+
+    # Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Erro', 'Acertou'], yticklabels=['Erro', 'Acertou'])
+    plt.ylabel('Real')
+    plt.xlabel('Previsto')
+    plt.title('Matriz de Confusão')
+    st.pyplot(plt)
+    plt.clf()  # Clear the figure for the next plot
+
+    # ROC Curve
+    y_probs = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_probs)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(fpr, tpr, color='blue', lw=2, label='Curva ROC (AUC = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='red', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('Taxa de Falsos Positivos')
+    plt.ylabel('Taxa de Verdadeiros Positivos')
+    plt.title('Curva ROC')
+    plt.legend(loc="lower right")
+    st.pyplot(plt)
+    plt.clf()  # Clear the figure for the next plot
+
+    # Feature Importance
+    if hasattr(model, 'feature_importances_'):
+        importances = model.feature_importances_
+        indices = np.argsort(importances)[::-1]
+
+        plt.figure(figsize=(10, 6))
+        plt.title('Importância das Características')
+        plt.bar(range(X_train.shape[1]), importances[indices], align='center')
+        plt.xticks(range(X_train.shape[1]), [X_train.columns[i] for i in indices], rotation=90)
+        plt.xlim([-1, X_train.shape[1]])
+        st.pyplot(plt)
+        plt.clf()  # Clear the figure for the next plot
