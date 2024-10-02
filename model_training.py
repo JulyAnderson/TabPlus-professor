@@ -1,10 +1,12 @@
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils import class_weight
+import numpy as np
+
 
 def train_model(X_train, y_train):
     # Calculate class weights for models
-    weights = class_weight.compute_class_weight('balanced', classes=[0, 1], y=y_train)
+    weights = class_weight.compute_class_weight('balanced', classes=np.array([0, 1]), y=y_train)
     class_weights = {0: weights[0], 1: weights[1]}
 
     # Train models
