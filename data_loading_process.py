@@ -3,6 +3,14 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from itertools import product
 
+
+#Perguntas a serem respondidas:
+#1. Quais as operações que os alunos mais possuem dificuldade?
+#2. Qual a melhor sala, tem como comparar?
+#3. Houve evolução com o numero de partida?
+#4. Existe alguma forma de agrupar esses alunos para dispensar atenção adequada a cada grupo?
+
+
 def load_and_preprocess_data():
     # Load the data
     df_inicial = pd.read_csv('games_inicial.csv')  # Connect directly to the API later
@@ -20,13 +28,11 @@ def load_and_preprocess_data():
 
 
     # 4. Encode categorical variables
-    df = df_inicial
+    df = df_inicial.copy()
     label_encoder_grade = LabelEncoder()
     label_encoder_player = LabelEncoder()
     df['game_grade'] = label_encoder_grade.fit_transform(df['game_grade'])
-    df['player'] = label_encoder_player.fit_transform(df['player'])
-
-    df_identificacao_encoder = df['player'] + df_inicial['player']
+    df['player_encoded'] = label_encoder_player.fit_transform(df['player'])
 
     # 5. Define features and target
     features = df[['fator1', 'fator2', 'hits', 'game_grade', 'game_year']]
@@ -35,5 +41,5 @@ def load_and_preprocess_data():
     # 6. Split data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.3, random_state=42)
 
-    return df_inicial, df, multiplications_df , df_identificacao_encoder,  X_train, X_test, y_train, y_test
+    return df_inicial, df, multiplications_df ,  X_train, X_test, y_train, y_test
 
