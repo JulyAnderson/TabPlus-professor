@@ -20,20 +20,23 @@ df_inicial, df, multiplications_df, X_train, X_test, y_train, y_test = load_and_
 models, class_weights = train_model(X_train, y_train)
 
 # Title of the dashboard
-st.title('Dashboard de Análise de Dificuldades dos Alunos')
+st.title('Análise dos Dados do Game Tab+')
 
 col1, col2 = st.columns(2)
 
 
 # Section 1: Errors in multiplications
 with col1:
+    quantidade_de_erros = [1,2,3,4,5,6,7,8]
+    selected_quantidade_de_erros= st.selectbox(label ="Selecione ", 
+                                               options = quantidade_de_erros)
     # count foreach categorical
     category_count = df['multiplication'].value_counts().reset_index()
     category_count.columns = ['multiplication', 'Contagem']
-    category_count = category_count[category_count['Contagem'] > 3]
+    category_count = category_count[category_count['Contagem'] > selected_quantidade_de_erros]
 
     # Barchart 
-    fig = px.bar(category_count, x='multiplication', y='Contagem', title ="Principais Erros na Multiplicação")
+    fig = px.bar(category_count, x='Contagem', y='multiplication', title ="Principais Erros na Multiplicação")
 
     # Show the chart no Streamlit
     st.plotly_chart(fig)
@@ -142,3 +145,24 @@ for name, model in models.items():
         plt.xlim([-1, X_train.shape[1]])
         st.pyplot(plt)
         plt.clf()  # Clear the figure for the next plot
+
+st.dataframe(df)
+
+# Criar duas novas colunas com os valores ordenados
+df['fator_min'] = df[['fator1', 'fator2']].min()
+df['fator_max'] = df[['fator1', 'fator2']].max()
+
+# Agora conte as combinações usando as novas colunas
+contagem_fator_mais_erro = df[['fator_min', 'fator_max']].value_counts() > 8
+
+
+fig = px.bar(
+    contagem_fator_mais_erro, 
+    x=contagem_fator_mais_erro.apply(lambda row: f"{row['fator_min']}x{row['fator_max']}", axis=1), 
+    y='count', 
+    title='Top 10 Combinações de Fatores com Mais Erros',
+    labels={'x': 'Combinação de Fatores', 'count': 'Contagem de Erros'}
+)
+
+# Exibir o gráfico no Streamlit
+st.plotly_chart(fig)
