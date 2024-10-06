@@ -31,11 +31,28 @@ def load_and_preprocess_data():
     df = df_inicial.copy()
     label_encoder_grade = LabelEncoder()
     label_encoder_player = LabelEncoder()
-    df['game_grade'] = label_encoder_grade.fit_transform(df['game_grade'])
+    df['game_grade_encoded'] = label_encoder_grade.fit_transform(df['game_grade'])
     df['player_encoded'] = label_encoder_player.fit_transform(df['player'])
 
+    # Criar um mapeamento para substituir valores únicos de 'player_encoded' por rótulos genéricos
+    unique_players = df['player_encoded'].unique()
+    player_mapping = {player: f'Jogador {i+1}' for i, player in enumerate(unique_players)}
+
+    # Aplicar o mapeamento para anonimizar a coluna 'player_encoded'
+    df['player_anonymized'] = df['player_encoded'].map(player_mapping)
+
+    # Visualizar as primeiras linhas para verificar a anonimização
+    df[['player', 'player_encoded', 'player_anonymized']].head()
+
+    # Substituir a coluna 'player' pelos valores anonimizados da coluna 'player_anonymized'
+    df['player'] = df['player_anonymized']
+
+    # Remover a coluna temporária 'player_anonymized'
+    df = df.drop(columns=['player_anonymized'])
+
+
     # 5. Define features and target
-    features = df[['fator1', 'fator2', 'hits', 'game_grade', 'game_year']]
+    features = df[['fator1', 'fator2', 'hits', 'game_grade_encoded', 'game_year']]
     target = df['erro']
 
     # 6. Split data into training and testing sets

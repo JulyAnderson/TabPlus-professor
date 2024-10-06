@@ -1,168 +1,147 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
-from sklearn.metrics import (accuracy_score, classification_report,
-                             confusion_matrix, roc_curve, auc)
-
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
 from data_loading_process import load_and_preprocess_data
 from model_training import train_model
 
+# Configuração do layout do dashboard
 st.set_page_config(layout="wide")
+st.title('Análise dos Dados do Jogo Tab+')
 
-# Load data and preprocess
+# Carregar dados
 df_inicial, df, multiplications_df, X_train, X_test, y_train, y_test = load_and_preprocess_data()
-
-
-# Train models
 models, class_weights = train_model(X_train, y_train)
 
-# Title of the dashboard
-st.title('Análise dos Dados do Game Tab+')
+# Navbar lateral para selecionar a seção
+st.sidebar.title("Navegação")
+options = st.sidebar.radio("Selecione uma seção:", ("Visão Geral", "Análise de Turmas", "Análise Individual", "Avaliação dos Modelos"))
 
-col1, col2 = st.columns(2)
+# Seção: Visão Geral
+if options == "Visão Geral":
+    st.header("Visão Geral")
+    col1, col2 = st.columns(2)
 
+    with col1:
+        st.subheader("Principais Erros de Multiplicação")
+        category_count = df['multiplication'].value_counts().reset_index()
+        category_count.columns = ['multiplication', 'Contagem']
+        category_count = category_count[category_count['Contagem'] > 7]
+        fig = px.bar(category_count, x='Contagem', y='multiplication', title="Multiplicações com Mais Erros")
+        st.plotly_chart(fig)
 
-# Section 1: Errors in multiplications
-with col1:
-    quantidade_de_erros = [1,2,3,4,5,6,7,8]
-    selected_quantidade_de_erros= st.selectbox(label ="Selecione ", 
-                                               options = quantidade_de_erros)
-    # count foreach categorical
-    category_count = df['multiplication'].value_counts().reset_index()
-    category_count.columns = ['multiplication', 'Contagem']
-    category_count = category_count[category_count['Contagem'] > selected_quantidade_de_erros]
+    with col2:
+        st.subheader("Comparação de Performance entre Turmas")
+        performance_by_grade = df.groupby('game_grade')['hits'].mean().reset_index()
+        performance_by_grade = performance_by_grade[performance_by_grade['hits'] > 0].sort_values(by='game_grade')
+        fig = px.bar(performance_by_grade, x='game_grade', y='hits', title="Desempenho Médio por Turma")
+        st.plotly_chart(fig)
 
-    # Barchart 
-    fig = px.bar(category_count, x='Contagem', y='multiplication', title ="Principais Erros na Multiplicação")
+# Seção: Análise de Turmas
+elif options == "Análise de Turmas":
+    st.header("Análise de Turmas")
+    selected_turma = st.selectbox("Selecione a turma", df['game_grade'].unique())
+    turma_df = df[df['game_grade'] == selected_turma]
 
-    # Show the chart no Streamlit
+    st.subheader(f"Distribuição dos Acertos dos Alunos na Turma {selected_turma}")
+    fig, ax = plt.subplots(figsize=(12, 6))
+    sns.boxplot(x='player', y='hits', data=turma_df, ax=ax)
+    ax.set_title("Distribuição de Acertos por Aluno")
+    ax.set_xlabel("Aluno")
+    ax.set_ylabel("Acertos")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+#Seção: Análise Individual 
+elif options == "Análise Individual":
+    st.header("Análise Individual")
+    selected_player = st.selectbox("Selecione o aluno", df['player'].unique())
+    player_df = df[df['player'] == selected_player]
+
+    st.subheader(f"Evolução do Aluno {selected_player} ao Longo do Tempo")
+    fig = px.line(player_df, x='game_id', y='hits', title=f"Evolução dos Acertos para {selected_player}", 
+                  labels={'game_id': 'ID do Jogo', 'hits': 'Acertos'})
     st.plotly_chart(fig)
 
-with col2:
-    # Section 2: Comparing classes
-    # Group by class and calculate mean of hits
-    performance_by_grade = df_inicial.groupby('game_grade')['hits'].mean().reset_index()
 
-    # Filter out classes with a mean of hits equal to 0
-    performance_by_grade = performance_by_grade[performance_by_grade['hits'] > 0]
+# Seção: Avaliação dos Modelos de Machine Learning
+elif options == "Avaliação dos Modelos":
+    from sklearn.cluster import KMeans, DBSCAN
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import silhouette_score
 
-    # Sort the data by game_grade
-    performance_by_grade = performance_by_grade.sort_values(by='game_grade')
+    # Seleciona colunas para agrupamento (exemplo: acertos e erros em multiplicações específicas)
+    grouping_data = df[['hits', 'fator1', 'fator2']]
 
-    # Create comparison bar chart
-    fig = px.bar(performance_by_grade, x='game_grade', y='hits', labels={'hits': 'Average Hits'}, title="Comparação de Performance entre as turmas")
+    # Padroniza os dados
+    scaler = StandardScaler()
+    grouping_data_scaled = scaler.fit_transform(grouping_data)
 
-    # Display in Streamlit
-    st.plotly_chart(fig)
+    # Aplica o modelo K-Means
+    kmeans = KMeans(n_clusters=5, random_state=42)
+    df['Cluster_KMeans'] = kmeans.fit_predict(grouping_data_scaled)
 
+    # Calcula o Silhouette Score para o K-Means
+    silhouette_kmeans = silhouette_score(grouping_data_scaled, df['Cluster_KMeans'])
 
-# Seletor de turma
-selected_turma = st.selectbox("Selecione a turma", df_inicial['game_grade'].unique())
+    # Adiciona estatísticas por grupo para o K-Means
+    group_stats_kmeans = df.groupby('Cluster_KMeans').agg({
+        'hits': ['mean', 'std'],
+        'multiplication': lambda x: x.value_counts().idxmax()  # Operação com maior número de erros
+    }).reset_index()
+    group_stats_kmeans.columns = ['Cluster', 'Mean Hits', 'Hits Std Dev', 'Most Common Multiplication Error']
 
-# Filtro da turma selecionada
-turma_df = df_inicial[df_inicial['game_grade'] == selected_turma]
+    # Exibe as estatísticas dos clusters do K-Means no Streamlit
+    st.header("Agrupamento de Alunos com K-Means")
+    st.write(f"Silhouette Score para K-Means: {silhouette_kmeans:.2f}")
+    st.write("Grupos de alunos com dificuldades em comum:")
+    st.dataframe(group_stats_kmeans)
 
-# Seletor para permitir a comparação do desempenho dos alunos
-selected_players = st.multiselect("Selecione os alunos para comparar", turma_df['player'].unique())
+    # Exibe um gráfico de dispersão para visualização dos clusters do K-Means
+    fig_kmeans = px.scatter(df, x='hits', y='multiplication', color='Cluster_KMeans', 
+                            title="Distribuição dos Alunos pelos Clusters - K-Means",
+                            labels={'hits': 'Acertos', 'multiplication': 'Multiplicação'})
+    st.plotly_chart(fig_kmeans)
 
-if selected_players:
-    st.subheader(f"Comparando o desempenho dos alunos na turma {selected_turma}")
+    # Aplica o modelo DBSCAN
+    dbscan = DBSCAN(eps=0.5, min_samples=5)
+    df['Cluster_DBSCAN'] = dbscan.fit_predict(grouping_data_scaled)
 
-    # Filtrar os dados para os alunos selecionados
-    filtered_df = turma_df[turma_df['player'].isin(selected_players)]
+    # Calcula o Silhouette Score para o DBSCAN (excluindo outliers rotulados como -1)
+    silhouette_dbscan = silhouette_score(grouping_data_scaled[df['Cluster_DBSCAN'] != -1], 
+                                         df[df['Cluster_DBSCAN'] != -1]['Cluster_DBSCAN'])
 
-    # Plotar a evolução dos acertos em um único gráfico
-    plt.figure(figsize=(10, 4))
-    
-    for player in selected_players:
-        player_data = filtered_df[filtered_df['player'] == player]
-        plt.plot(player_data['game_grade'], player_data['hits'], marker='o', label=player,)
-    
-    plt.xlabel('Jogo (game_grade)')
-    plt.ylabel('Acertos')
-    plt.title(f"Evolução de Acertos na Turma {selected_turma}")
-    plt.legend()
-    st.pyplot(plt)
+    # Adiciona estatísticas por grupo para o DBSCAN (excluindo outliers)
+    group_stats_dbscan = df[df['Cluster_DBSCAN'] != -1].groupby('Cluster_DBSCAN').agg({
+        'hits': ['mean', 'std'],
+        'multiplication': lambda x: x.value_counts().idxmax()
+    }).reset_index()
+    group_stats_dbscan.columns = ['Cluster', 'Mean Hits', 'Hits Std Dev', 'Most Common Multiplication Error']
 
+    # Exibe as estatísticas dos clusters do DBSCAN no Streamlit
+    st.header("Agrupamento de Alunos com DBSCAN")
+    st.write(f"Silhouette Score para DBSCAN (excluindo outliers): {silhouette_dbscan:.2f}")
+    st.write("Grupos de alunos com dificuldades em comum (DBSCAN):")
+    st.dataframe(group_stats_dbscan)
 
-# Section 3: Select Class for Analysis
-# Add your class selection code here...
+    # Exibe um gráfico de dispersão para visualização dos clusters do DBSCAN
+    fig_dbscan = px.scatter(df[df['Cluster_DBSCAN'] != -1], x='hits', y='multiplication', color='Cluster_DBSCAN', 
+                            title="Distribuição dos Alunos pelos Clusters - DBSCAN",
+                            labels={'hits': 'Acertos', 'multiplication': 'Multiplicação'})
+    st.plotly_chart(fig_dbscan)
 
-# Section 4: Model Training and Evaluation
-st.title("Modelo de Machine Learning para Análise de Desempenho")
+    # Exibe mensagem se houverem muitos outliers detectados pelo DBSCAN
+    num_outliers = len(df[df['Cluster_DBSCAN'] == -1])
+    if num_outliers > 0:
+        st.write(f"DBSCAN detectou {num_outliers} alunos como outliers.")
 
-# Evaluate models
-for name, model in models.items():
-    y_pred = model.predict(X_test)
-
-    st.write(f"**Model:** {name}")
-    st.write(f"**Acurácia:** {accuracy_score(y_test, y_pred):.2f}")
-
-    # Classification report
-    report = classification_report(y_test, y_pred, output_dict=True)
-    st.write("**Relatório de Classificação:**")
-    st.write(pd.DataFrame(report).transpose())
-
-    # Confusion Matrix
-    cm = confusion_matrix(y_test, y_pred)
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Erro', 'Acertou'], yticklabels=['Erro', 'Acertou'])
-    plt.ylabel('Real')
-    plt.xlabel('Previsto')
-    plt.title('Matriz de Confusão')
-    st.pyplot(plt)
-    plt.clf()  # Clear the figure for the next plot
-
-    # ROC Curve
-    y_probs = model.predict_proba(X_test)[:, 1]
-    fpr, tpr, _ = roc_curve(y_test, y_probs)
-    roc_auc = auc(fpr, tpr)
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(fpr, tpr, color='blue', lw=2, label='Curva ROC (AUC = %0.2f)' % roc_auc)
-    plt.plot([0, 1], [0, 1], color='red', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('Taxa de Falsos Positivos')
-    plt.ylabel('Taxa de Verdadeiros Positivos')
-    plt.title('Curva ROC')
-    plt.legend(loc="lower right")
-    st.pyplot(plt)
-    plt.clf()  # Clear the figure for the next plot
-
-    # Feature Importance
-    if hasattr(model, 'feature_importances_'):
-        importances = model.feature_importances_
-        indices = np.argsort(importances)[::-1]
-
-        plt.figure(figsize=(10, 6))
-        plt.title('Importância das Características')
-        plt.bar(range(X_train.shape[1]), importances[indices], align='center')
-        plt.xticks(range(X_train.shape[1]), [X_train.columns[i] for i in indices], rotation=90)
-        plt.xlim([-1, X_train.shape[1]])
-        st.pyplot(plt)
-        plt.clf()  # Clear the figure for the next plot
+    # Conclusão sobre o modelo de agrupamento
+    st.write("**Escolha do Modelo:**")
+    if silhouette_kmeans > silhouette_dbscan:
+        st.write("K-Means apresenta um melhor Silhouette Score e pode ser mais adequado para o agrupamento.")
+    else:
+        st.write("DBSCAN apresenta um Silhouette Score competitivo e pode ser melhor para detectar grupos com diferentes formas.")
 
 st.dataframe(df)
-
-# Criar duas novas colunas com os valores ordenados
-df['fator_min'] = df[['fator1', 'fator2']].min()
-df['fator_max'] = df[['fator1', 'fator2']].max()
-
-# Agora conte as combinações usando as novas colunas
-contagem_fator_mais_erro = df[['fator_min', 'fator_max']].value_counts() > 8
-
-
-fig = px.bar(
-    contagem_fator_mais_erro, 
-    x=contagem_fator_mais_erro.apply(lambda row: f"{row['fator_min']}x{row['fator_max']}", axis=1), 
-    y='count', 
-    title='Top 10 Combinações de Fatores com Mais Erros',
-    labels={'x': 'Combinação de Fatores', 'count': 'Contagem de Erros'}
-)
-
-# Exibir o gráfico no Streamlit
-st.plotly_chart(fig)
