@@ -1,23 +1,67 @@
+# Importações
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
-from data_loading_process import load_and_preprocess_data
-from model_training import train_model
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.neighbors import NearestNeighbors
+from itertools import product
+from keras.models import Model, load_model
+from keras.layers import Input, Dense
+import joblib
 
-# Configuração do layout do dashboard
+def load_and_preprocess_data():
+    # Carregar os dados
+    df = pd.read_csv('games_inicial.csv')
+
+    # Pré-processamento dos dados
+    df[['fator1', 'fator2']] = df['multiplication'].str.split('x', expand=True).astype(int)
+    df['erro'] = (df['answer'] != df['result']).astype(int)
+
+    # Codificar variáveis categóricas
+    label_encoder_grade = LabelEncoder()
+    label_encoder_player = LabelEncoder()
+    df['game_grade_encoded'] = label_encoder_grade.fit_transform(df['game_grade'])
+    df['player_encoded'] = label_encoder_player.fit_transform(df['player'])
+
+    # Substituir valores únicos de 'player_encoded' por rótulos genéricos
+    unique_players = df['player_encoded'].unique()
+    player_mapping = {player: f'Jogador {i + 1}' for i, player in enumerate(unique_players)}
+    df['player'] = df['player_encoded'].map(player_mapping)
+
+    # Definir características e alvo
+    features = df[['hits', 'fator1', 'fator2','erro','game_grade_encoded']]
+    target = df['erro']
+
+    # Dividir os dados em conjuntos de treinamento e teste
+    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.3, random_state=42)
+
+    return df, X_train, X_test, y_train, y_test
+
+def load_models():
+    # Carregar o modelo de autoencoder
+    encoder_model = load_model('encoder_model.h5')
+    # Carregar o modelo de K-means
+    kmeans = joblib.load('kmeans_model.pkl')
+    return encoder_model, kmeans
+
+# Configuração do dashboard do Streamlit
 st.set_page_config(layout="wide")
 st.title('Análise dos Dados do Jogo Tab+')
 
 # Carregar dados
-df_inicial, df, multiplications_df, X_train, X_test, y_train, y_test = load_and_preprocess_data()
-models, class_weights = train_model(X_train, y_train)
+df, X_train, X_test, y_train, y_test = load_and_preprocess_data()
 
-# Navbar lateral para selecionar a seção
+# Navegação na barra lateral
 st.sidebar.title("Navegação")
-options = st.sidebar.radio("Selecione uma seção:", ("Visão Geral", "Análise de Turmas", "Análise Individual", "Avaliação dos Modelos"))
+options = st.sidebar.radio("Selecione uma seção:", 
+                            ("Visão Geral", "Análise de Turmas", "Análise Individual", "Avaliação dos Modelos"))
 
 # Seção: Visão Geral
 if options == "Visão Geral":
@@ -54,7 +98,7 @@ elif options == "Análise de Turmas":
     plt.xticks(rotation=45)
     st.pyplot(fig)
 
-#Seção: Análise Individual 
+# Seção: Análise Individual
 elif options == "Análise Individual":
     st.header("Análise Individual")
     selected_player = st.selectbox("Selecione o aluno", df['player'].unique())
@@ -65,83 +109,67 @@ elif options == "Análise Individual":
                   labels={'game_id': 'ID do Jogo', 'hits': 'Acertos'})
     st.plotly_chart(fig)
 
-
-# Seção: Avaliação dos Modelos de Machine Learning
+# Seção: Avaliação dos Modelos
 elif options == "Avaliação dos Modelos":
-    from sklearn.cluster import KMeans, DBSCAN
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.metrics import silhouette_score
+    st.header("Avaliação dos Modelos")
 
-    # Seleciona colunas para agrupamento (exemplo: acertos e erros em multiplicações específicas)
-    grouping_data = df[['hits', 'fator1', 'fator2']]
+    # Carregar os modelos
+    encoder_model, kmeans = load_models()
 
-    # Padroniza os dados
-    scaler = StandardScaler()
-    grouping_data_scaled = scaler.fit_transform(grouping_data)
-
-    # Aplica o modelo K-Means
-    kmeans = KMeans(n_clusters=5, random_state=42)
-    df['Cluster_KMeans'] = kmeans.fit_predict(grouping_data_scaled)
-
-    # Calcula o Silhouette Score para o K-Means
-    silhouette_kmeans = silhouette_score(grouping_data_scaled, df['Cluster_KMeans'])
-
-    # Adiciona estatísticas por grupo para o K-Means
-    group_stats_kmeans = df.groupby('Cluster_KMeans').agg({
-        'hits': ['mean', 'std'],
-        'multiplication': lambda x: x.value_counts().idxmax()  # Operação com maior número de erros
-    }).reset_index()
-    group_stats_kmeans.columns = ['Cluster', 'Mean Hits', 'Hits Std Dev', 'Most Common Multiplication Error']
-
-    # Exibe as estatísticas dos clusters do K-Means no Streamlit
-    st.header("Agrupamento de Alunos com K-Means")
-    st.write(f"Silhouette Score para K-Means: {silhouette_kmeans:.2f}")
-    st.write("Grupos de alunos com dificuldades em comum:")
-    st.dataframe(group_stats_kmeans)
-
-    # Exibe um gráfico de dispersão para visualização dos clusters do K-Means
-    fig_kmeans = px.scatter(df, x='hits', y='multiplication', color='Cluster_KMeans', 
-                            title="Distribuição dos Alunos pelos Clusters - K-Means",
-                            labels={'hits': 'Acertos', 'multiplication': 'Multiplicação'})
-    st.plotly_chart(fig_kmeans)
-
-    # Aplica o modelo DBSCAN
-    dbscan = DBSCAN(eps=0.5, min_samples=5)
-    df['Cluster_DBSCAN'] = dbscan.fit_predict(grouping_data_scaled)
-
-    # Calcula o Silhouette Score para o DBSCAN (excluindo outliers rotulados como -1)
-    silhouette_dbscan = silhouette_score(grouping_data_scaled[df['Cluster_DBSCAN'] != -1], 
-                                         df[df['Cluster_DBSCAN'] != -1]['Cluster_DBSCAN'])
-
-    # Adiciona estatísticas por grupo para o DBSCAN (excluindo outliers)
-    group_stats_dbscan = df[df['Cluster_DBSCAN'] != -1].groupby('Cluster_DBSCAN').agg({
-        'hits': ['mean', 'std'],
-        'multiplication': lambda x: x.value_counts().idxmax()
-    }).reset_index()
-    group_stats_dbscan.columns = ['Cluster', 'Mean Hits', 'Hits Std Dev', 'Most Common Multiplication Error']
-
-    # Exibe as estatísticas dos clusters do DBSCAN no Streamlit
-    st.header("Agrupamento de Alunos com DBSCAN")
-    st.write(f"Silhouette Score para DBSCAN (excluindo outliers): {silhouette_dbscan:.2f}")
-    st.write("Grupos de alunos com dificuldades em comum (DBSCAN):")
-    st.dataframe(group_stats_dbscan)
-
-    # Exibe um gráfico de dispersão para visualização dos clusters do DBSCAN
-    fig_dbscan = px.scatter(df[df['Cluster_DBSCAN'] != -1], x='hits', y='multiplication', color='Cluster_DBSCAN', 
-                            title="Distribuição dos Alunos pelos Clusters - DBSCAN",
-                            labels={'hits': 'Acertos', 'multiplication': 'Multiplicação'})
-    st.plotly_chart(fig_dbscan)
-
-    # Exibe mensagem se houverem muitos outliers detectados pelo DBSCAN
-    num_outliers = len(df[df['Cluster_DBSCAN'] == -1])
-    if num_outliers > 0:
-        st.write(f"DBSCAN detectou {num_outliers} alunos como outliers.")
-
-    # Conclusão sobre o modelo de agrupamento
-    st.write("**Escolha do Modelo:**")
-    if silhouette_kmeans > silhouette_dbscan:
-        st.write("K-Means apresenta um melhor Silhouette Score e pode ser mais adequado para o agrupamento.")
+    # Certifique-se de que os dados de entrada estão corretos
+    input_shape = encoder_model.input_shape[1]
+    if X_train.shape[1] != input_shape:
+        st.error(f"O modelo espera uma entrada de {input_shape} características, mas recebeu {X_train.shape[1]}.")
     else:
-        st.write("DBSCAN apresenta um Silhouette Score competitivo e pode ser melhor para detectar grupos com diferentes formas.")
+        # Codificar os dados de entrada usando o encoder
+        encoded_data = encoder_model.predict(X_train)
 
-st.dataframe(df)
+        # Obter os clusters
+        kmeans_labels = kmeans.predict(encoded_data)
+
+        # Combinar os dados originais com os rótulos de cluster
+        cluster_df = pd.DataFrame(X_train, columns=['hits', 'fator1', 'fator2', 'erro', 'game_grade_encoded'])
+        cluster_df['Cluster'] = kmeans_labels
+
+        # Calcular estatísticas descritivas para cada cluster
+        cluster_stats = cluster_df.groupby('Cluster').agg({
+            'hits': ['mean', 'std'],
+            'fator1': ['mean', 'std'],
+            'fator2': ['mean', 'std'],
+            'erro': ['mean', 'std'],
+            'game_grade_encoded': ['mean', 'std']
+        })
+
+        # Exibir as estatísticas dos clusters
+        st.write("Estatísticas Descritivas dos Clusters")
+        st.write(cluster_stats)
+
+        # Gerar descrições textuais dos clusters
+        st.subheader("Descrições dos Clusters")
+        for cluster in cluster_stats.index:
+            stats = cluster_stats.loc[cluster]
+            description = f"""
+            Cluster {cluster}:
+            - Média de acertos: {stats[('hits', 'mean')]:.2f} (±{stats[('hits', 'std')]:.2f})
+            - Fator 1 médio: {stats[('fator1', 'mean')]:.2f} (±{stats[('fator1', 'std')]:.2f})
+            - Fator 2 médio: {stats[('fator2', 'mean')]:.2f} (±{stats[('fator2', 'std')]:.2f})
+            - Taxa de erro média: {stats[('erro', 'mean')]:.2f} (±{stats[('erro', 'std')]:.2f})
+            - Nível de turma médio: {stats[('game_grade_encoded', 'mean')]:.2f} (±{stats[('game_grade_encoded', 'std')]:.2f})
+            
+            Interpretação: Este cluster representa alunos com um nível de desempenho 
+            {'alto' if stats[('hits', 'mean')] > cluster_stats[('hits', 'mean')].mean() else 'baixo'}, 
+            trabalhando com multiplicações de dificuldade 
+            {'alta' if stats[('fator1', 'mean')] * stats[('fator2', 'mean')] > (cluster_stats[('fator1', 'mean')] * cluster_stats[('fator2', 'mean')]).mean() else 'baixa'}, 
+            e com uma taxa de erro 
+            {'alta' if stats[('erro', 'mean')] > cluster_stats[('erro', 'mean')].mean() else 'baixa'}.
+            """
+            st.write(description)
+
+        # Visualizar os clusters (mantenha a visualização original)
+        st.subheader("Visualização dos Clusters com Autoencoder + K-means")
+        fig = plt.figure(figsize=(8, 6))
+        plt.scatter(encoded_data[:, 0], encoded_data[:, 1], c=kmeans_labels, cmap='viridis')
+        plt.title('Clusters Identificados com Autoencoder e K-means')
+        plt.xlabel('Feature 1 (Codificada)')
+        plt.ylabel('Feature 2 (Codificada)')
+        st.pyplot(fig)
