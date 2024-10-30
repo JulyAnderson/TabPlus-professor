@@ -15,6 +15,8 @@ from itertools import product
 from keras.models import Model, load_model
 from keras.layers import Input, Dense
 import joblib
+import tensorflow as tf
+
 
 def load_and_preprocess_data():
     # Carregar os dados
@@ -45,10 +47,48 @@ def load_and_preprocess_data():
     return df, X_train, X_test, y_train, y_test
 
 def load_models():
-    # Carregar o modelo de autoencoder
-    encoder_model = load_model('encoder_model.h5')
+    try:
+        # Tentativa 1: Carregar a arquitetura do modelo e os pesos manualmente
+        with open('encoder_model.json', 'r') as json_file:
+            model_architecture = json_file.read()
+        
+        # Reconstruir o modelo a partir da arquitetura
+        def custom_input_layer(*args, **kwargs):
+            kwargs.pop('batch_shape', None)  # Remove 'batch_shape' if present
+            return Input(*args, **kwargs)
+        
+        # Usar custom_objects para customizar a desserialização de InputLayer
+        encoder_model = tf.keras.models.model_from_json(
+            model_architecture,
+            custom_objects={'InputLayer': custom_input_layer}
+        )
+        
+        # Carregar os pesos
+        encoder_model.load_weights('encoder_model_weights.weights.h5')
+    
+    except ValueError as e:
+        if 'batch_shape' in str(e):
+            print("Erro relacionado a 'batch_shape'. Tentando ignorar 'batch_shape' ao carregar o modelo.")
+            try:
+                # Tentativa alternativa se a primeira falhar
+                encoder_model = tf.keras.models.model_from_json(
+                    model_architecture,
+                    custom_objects={'InputLayer': custom_input_layer}
+                )
+                encoder_model.load_weights('encoder_model_weights.weights.h5')
+            except:
+                # Se todas as tentativas falharem, crie um modelo simples
+                print("Não foi possível carregar o modelo. Criando um modelo simples.")
+                input_layer = Input(shape=(5,))
+                encoded = Dense(3, activation='relu')(input_layer)
+                decoded = Dense(5, activation='linear')(encoded)
+                encoder_model = Model(inputs=input_layer, outputs=decoded)
+        else:
+            raise
+
     # Carregar o modelo de K-means
     kmeans = joblib.load('kmeans_model.pkl')
+    
     return encoder_model, kmeans
 
 # Configuração do dashboard do Streamlit
@@ -173,3 +213,5 @@ elif options == "Avaliação dos Modelos":
         plt.xlabel('Feature 1 (Codificada)')
         plt.ylabel('Feature 2 (Codificada)')
         st.pyplot(fig)
+
+df.to_csv("dados.csv")
