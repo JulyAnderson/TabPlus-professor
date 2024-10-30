@@ -130,12 +130,12 @@ elif options == "Análise de Turmas":
     turma_df = df[df['game_grade'] == selected_turma]
 
     st.subheader(f"Distribuição dos Acertos dos Alunos na Turma {selected_turma}")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.boxplot(x='player', y='hits', data=turma_df, ax=ax)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.boxplot(x='hits', y='player', data=turma_df, ax=ax)
     ax.set_title("Distribuição de Acertos por Aluno")
     ax.set_xlabel("Aluno")
     ax.set_ylabel("Acertos")
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=0)
     st.pyplot(fig)
 
 # Seção: Análise Individual
