@@ -413,3 +413,10 @@ game_id,game_grade,game_year,player,hits,multiplication,answer,result
 432,6E,2024,Lalau,0,0 x 1,0,0
 433,6E,2024,Fulano de tal 123,0,3 x 2,0,6
 434,6E,2024,Um aleatorio 69,0,0 x 11,59,0
+435,6A,2024,teste,0,0 x 8,0,0
+436,6A,2024,teste,0,4 x 5,0,20
+437,6A,2024,teste,0,0 x 13,0,0
+438,6A,2024,teste,0,3 x 10,0,30
+439,6B,2024,teste,0,3 x 9,56,27
+440,6A,2024,teste,3,5 x 13,46,65
+441,6A,2024,teste,2,5 x 7,0,35

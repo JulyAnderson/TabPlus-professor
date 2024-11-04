@@ -74,6 +74,10 @@ df = pd.read_csv('games_inicial.csv')
 
 # Encontrando os outliers usados para testes, através da pontuação.
 
+<<<<<<< HEAD
+=======
+# In[ ]:
+>>>>>>> 22d28dbc861d835135b4198f8467a125b61c16b2
 
 
 df.sort_values(by= "hits", ascending = False)
@@ -81,6 +85,10 @@ df.sort_values(by= "hits", ascending = False)
 
 # Eliminando os valores maiores de 35 pontos, pois esses valores são de testes e podem influenciar a análise posterior.
 
+<<<<<<< HEAD
+=======
+# In[4]:
+>>>>>>> 22d28dbc861d835135b4198f8467a125b61c16b2
 
 
 df = df.drop(df[df['hits'] >  100 ].index)
@@ -88,6 +96,10 @@ df = df.drop(df[df['hits'] >  100 ].index)
 
 # Buscando os valores únicos para a variável player
 
+<<<<<<< HEAD
+=======
+# In[ ]:
+>>>>>>> 22d28dbc861d835135b4198f8467a125b61c16b2
 
 
 jogadores_unicos= df.player.unique()
@@ -98,6 +110,10 @@ jogadores_unicos
 
 # Deletando jogadores de teste.
 
+<<<<<<< HEAD
+=======
+# In[6]:
+>>>>>>> 22d28dbc861d835135b4198f8467a125b61c16b2
 
 
 players_para_eliminar = ['Admin', 'and', 'Teste']
@@ -105,6 +121,10 @@ df = df[~df['player'].isin(players_para_eliminar)]
 df.to_csv('games.csv', index=False)
 
 
+<<<<<<< HEAD
+=======
+# In[ ]:
+>>>>>>> 22d28dbc861d835135b4198f8467a125b61c16b2
 
 
 # 1. Contar a ocorrência de cada jogador
@@ -131,6 +151,12 @@ player_mapping = {player: f'Jogador {i + 1}' for i, player in enumerate(unique_p
 # Replace player names in the DataFrame using the mapping
 df['player'] = df['player'].map(player_mapping)
 
+<<<<<<< HEAD
+=======
+# Display the updated DataFrame
+st.dataframe(df)
+
+>>>>>>> 22d28dbc861d835135b4198f8467a125b61c16b2
 
 # Os dados serão anonimizados eliminando a identificação do jogador.
 
@@ -235,7 +261,11 @@ df_multiplicacoes
 
 
 valores_sem_correspondencia = df_multiplicacoes[~df_multiplicacoes['Multiplicação'].isin(df['multiplication'])]
+<<<<<<< HEAD
 print (f"Multiplicações onde não houverem erros: {valores_sem_correspondencia['Multiplicação'].tolist()}")
+=======
+pprint (f"Multiplicações onde não houverem erros: {valores_sem_correspondencia['Multiplicação'].tolist()}")
+>>>>>>> 22d28dbc861d835135b4198f8467a125b61c16b2
 
 
 # Analisando a distribuição de acertos pelo boxplot. Observamos que há um aluno que se destaca bastante nos acertos (35 pontos). A mediana se confirma em 3 pontos.
