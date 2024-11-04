@@ -113,7 +113,10 @@ if options == "Visão Geral":
         category_count = df['multiplication'].value_counts().reset_index()
         category_count.columns = ['multiplication', 'Contagem']
         category_count = category_count[category_count['Contagem'] > 7]
-        fig = px.bar(category_count, x='Contagem', y='multiplication', title="Multiplicações com Mais Erros")
+        fig = px.bar(category_count, x='Contagem', y='multiplication')
+        fig.update_layout(
+        xaxis_title="Contagem de Erros",
+        yaxis_title="Multiplicação")
         st.plotly_chart(fig)
 
     with col2:
@@ -121,6 +124,9 @@ if options == "Visão Geral":
         performance_by_grade = df.groupby('game_grade')['hits'].mean().reset_index()
         performance_by_grade = performance_by_grade[performance_by_grade['hits'] > 0].sort_values(by='game_grade')
         fig = px.bar(performance_by_grade, x='game_grade', y='hits', title="Desempenho Médio por Turma")
+        fig.update_layout(
+        xaxis_title="Turma",
+        yaxis_title="Acertos")
         st.plotly_chart(fig)
 
 # Seção: Análise de Turmas
@@ -133,10 +139,16 @@ elif options == "Análise de Turmas":
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.boxplot(x='hits', y='player', data=turma_df, ax=ax)
     ax.set_title("Distribuição de Acertos por Aluno")
-    ax.set_xlabel("Aluno")
-    ax.set_ylabel("Acertos")
+    ax.set_xlabel("Acertos")
+    ax.set_ylabel("")
     plt.xticks(rotation=0)
     st.pyplot(fig)
+    st.subheader ("Descrição do funcionamento do gráfico")
+    st.write("O boxplot é um gráfico estatístico útil para visualizar a distribuição de um conjunto de dados. ")
+    st.write(f'''1. Caixa : Representa os 50% dos dados mais centrais. \n
+2. Linhas médias : Linha vertical dentro da caixa que indica a mediana dos dados. \n
+3. Bigodes: Linhas que se estendem a partir da caixa até os valores mínimo e máximo. \n
+4. Pontos fora da caixa: Pontos que estão fora da caixa e dos bigodes.''')
 
 # Seção: Análise Individual
 elif options == "Análise Individual":
@@ -146,7 +158,8 @@ elif options == "Análise Individual":
 
     st.subheader(f"Evolução do Aluno {selected_player} ao Longo do Tempo")
     fig = px.line(player_df, x='game_id', y='hits', title=f"Evolução dos Acertos para {selected_player}", 
-                  labels={'game_id': 'ID do Jogo', 'hits': 'Acertos'})
+                  labels={'game_id': 'Partidas no decorrer do tempo', 'hits': 'Acertos'})
+    fig.update_xaxes(showticklabels=False)
     st.plotly_chart(fig)
 
 # Seção: Avaliação dos Modelos
