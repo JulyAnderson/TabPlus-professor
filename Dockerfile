@@ -1,18 +1,29 @@
-# Escolha uma imagem base do Python
+# Use uma imagem base do Python
 FROM python:3.9-slim
 
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Copie os arquivos de requirements.txt e instale as dependências
-COPY requirements.txt requirements.txt
+# Copia os arquivos de requisitos primeiro para aproveitar o cache do Docker
+COPY requirements.txt .
+
+# Instala as dependências
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copie todo o conteúdo do projeto para o contêiner
+# Copia o resto dos arquivos do projeto
 COPY . .
 
-# Exponha a porta do Streamlit
-EXPOSE 8501
+# Cria um script de inicialização para executar os arquivos na ordem correta
+RUN echo '#!/bin/bash\n\
+python model_training.py && \
+python model_evaluation.py && \
+streamlit run app.py --server.port 8051 --server.address 0.0.0.0' > /app/start.sh
 
-# Defina o comando para iniciar o Streamlit
-CMD ["streamlit", "run", "app.py"]
+# Dá permissão de execução ao script
+RUN chmod +x /app/start.sh
+
+# Expõe a porta que o dashboard irá utilizar
+EXPOSE 8051
+
+# Define o comando para iniciar a aplicação
+CMD ["/app/start.sh"]
